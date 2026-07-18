@@ -1,0 +1,8 @@
+{
+  "name": "pdf-extractor",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "pdfjs-dist": "4.4.168"
+  }
+}
