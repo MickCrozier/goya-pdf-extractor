@@ -62,10 +62,7 @@ async function extractPdf(pdfBase64) {
         current.push(row.items[i]);
       }
       segments.push(current);
-      // Each segment becomes its own line
-      for (const seg of segments) {
-        lines.push(seg.map(it => it.text).join(' '));
-      }
+      lines.push(segments.map(seg => seg.map(it => it.text).join(' ')).join(' | '));
     }
   }
 
