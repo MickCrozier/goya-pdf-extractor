@@ -1,6 +1,10 @@
 'use strict';
 
 const http = require('http');
+const { execFile } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const PORT = process.env.PORT || 3000;
 
 let pdfjsLib = null;
@@ -69,10 +73,48 @@ async function extractPdf(pdfBase64) {
   return { text: lines.join('\n') };
 }
 
+async function renderPdf(pdfBase64) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdf-'));
+  const pdfPath = path.join(tmpDir, 'input.pdf');
+  const outPrefix = path.join(tmpDir, 'page');
+  try {
+    fs.writeFileSync(pdfPath, Buffer.from(pdfBase64, 'base64'));
+    await new Promise((resolve, reject) => {
+      execFile('pdftoppm', ['-jpeg', '-r', '150', '-l', '1', pdfPath, outPrefix], (err) => {
+        if (err) reject(err); else resolve();
+      });
+    });
+    const files = fs.readdirSync(tmpDir).filter(f => f.endsWith('.jpg'));
+    if (!files.length) throw new Error('pdftoppm produced no output');
+    const imgPath = path.join(tmpDir, files[0]);
+    return { imageBase64: fs.readFileSync(imgPath).toString('base64') };
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/render') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { pdfBase64 } = JSON.parse(body);
+        if (!pdfBase64) throw new Error('pdfBase64 is required');
+        const result = await renderPdf(pdfBase64);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
     return;
   }
 
