@@ -7,6 +7,10 @@ const os = require('os');
 const path = require('path');
 const PORT = process.env.PORT || 3000;
 
+// Stub browser globals pdfjs checks for at load time (Node.js has neither)
+if (typeof globalThis.DOMMatrix === 'undefined') globalThis.DOMMatrix = class DOMMatrix {};
+if (typeof globalThis.Path2D === 'undefined') globalThis.Path2D = class Path2D {};
+
 let pdfjsLib = null;
 async function getPdfjs() {
   if (!pdfjsLib) {
