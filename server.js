@@ -83,28 +83,15 @@ async function renderPdf(pdfBase64) {
   const outPrefix = path.join(tmpDir, 'page');
   try {
     fs.writeFileSync(pdfPath, Buffer.from(pdfBase64, 'base64'));
-    // Render all pages
     await new Promise((resolve, reject) => {
-      execFile('pdftoppm', ['-jpeg', '-r', '150', pdfPath, outPrefix], (err) => {
+      execFile('pdftoppm', ['-jpeg', '-r', '100', pdfPath, outPrefix], (err) => {
         if (err) reject(err); else resolve();
       });
     });
     const files = fs.readdirSync(tmpDir).filter(f => f.endsWith('.jpg')).sort();
     if (!files.length) throw new Error('pdftoppm produced no output');
-
-    if (files.length === 1) {
-      return { imageBase64: fs.readFileSync(path.join(tmpDir, files[0])).toString('base64') };
-    }
-
-    // Multiple pages: stack vertically with ImageMagick
-    const stitchedJpg = path.join(tmpDir, 'stitched.jpg');
-    const pageJpgs = files.map(f => path.join(tmpDir, f));
-    await new Promise((resolve, reject) => {
-      execFile('convert', ['-append', ...pageJpgs, stitchedJpg], (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
-    return { imageBase64: fs.readFileSync(stitchedJpg).toString('base64') };
+    const pages = files.map(f => fs.readFileSync(path.join(tmpDir, f)).toString('base64'));
+    return { pages };
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
